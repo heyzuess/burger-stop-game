@@ -10,7 +10,7 @@ os.environ.setdefault("SDL_HINT_RENDER_SCALE_QUALITY", "0")
 
 import pygame
 
-from game import Feedback, Game
+from game import ORDER_MS, Feedback, Game
 from orders import INGREDIENTS, PALETTE, TRAY_ORDER
 
 GAME_W, GAME_H = 320, 240
@@ -82,13 +82,41 @@ def draw_button(
     surf.blit(text, (tx, ty))
 
 
-def draw_customer(surf: pygame.Surface, x: int, y: int) -> None:
-    # 16x16 pixel face
+def draw_customer(surf: pygame.Surface, x: int, y: int, anger: int) -> None:
+    if anger >= 3:
+        skin = PALETTE["skin_rage"]
+    elif anger >= 2:
+        skin = PALETTE["skin_mad"]
+    else:
+        skin = PALETTE["skin"]
     pygame.draw.rect(surf, PALETTE["hair"], (x + 3, y, 10, 4))
-    pygame.draw.rect(surf, PALETTE["skin"], (x + 3, y + 3, 10, 9))
+    pygame.draw.rect(surf, skin, (x + 3, y + 3, 10, 9))
     pygame.draw.rect(surf, PALETTE["black"], (x + 5, y + 6, 2, 2))
     pygame.draw.rect(surf, PALETTE["black"], (x + 9, y + 6, 2, 2))
-    pygame.draw.rect(surf, PALETTE["black"], (x + 6, y + 9, 4, 1))
+    if anger == 0:
+        pygame.draw.rect(surf, PALETTE["black"], (x + 6, y + 9, 4, 1))
+        pygame.draw.rect(surf, PALETTE["black"], (x + 5, y + 10, 1, 1))
+        pygame.draw.rect(surf, PALETTE["black"], (x + 10, y + 10, 1, 1))
+    elif anger == 1:
+        pygame.draw.rect(surf, PALETTE["black"], (x + 6, y + 10, 4, 1))
+        pygame.draw.rect(surf, PALETTE["black"], (x + 4, y + 5, 3, 1))
+        pygame.draw.rect(surf, PALETTE["black"], (x + 9, y + 5, 3, 1))
+    elif anger == 2:
+        pygame.draw.rect(surf, PALETTE["black"], (x + 5, y + 10, 6, 1))
+        pygame.draw.rect(surf, PALETTE["black"], (x + 6, y + 9, 1, 1))
+        pygame.draw.rect(surf, PALETTE["black"], (x + 9, y + 9, 1, 1))
+        pygame.draw.rect(surf, PALETTE["black"], (x + 4, y + 4, 3, 1))
+        pygame.draw.rect(surf, PALETTE["black"], (x + 9, y + 4, 3, 1))
+    else:
+        pygame.draw.rect(surf, PALETTE["white"], (x + 5, y + 9, 6, 3))
+        pygame.draw.rect(surf, PALETTE["black"], (x + 5, y + 9, 6, 3), 1)
+        pygame.draw.rect(surf, PALETTE["black"], (x + 6, y + 10, 1, 1))
+        pygame.draw.rect(surf, PALETTE["black"], (x + 8, y + 10, 1, 1))
+        pygame.draw.rect(surf, PALETTE["black"], (x + 10, y + 10, 1, 1))
+        pygame.draw.rect(surf, PALETTE["black"], (x + 3, y + 4, 4, 1))
+        pygame.draw.rect(surf, PALETTE["black"], (x + 9, y + 4, 4, 1))
+        pygame.draw.rect(surf, PALETTE["red"], (x + 1, y + 2, 2, 2))
+        pygame.draw.rect(surf, PALETTE["red"], (x + 13, y + 2, 2, 2))
     pygame.draw.rect(surf, PALETTE["navy_hi"], (x + 2, y + 12, 12, 6))
 
 
@@ -129,6 +157,18 @@ def draw_burger_layer(
             (cx + width // 2 - 2, top + 1),
         )
     return h
+
+
+def stack_layer_rects(items: list[str] | tuple[str, ...], area: pygame.Rect) -> list[tuple[int, pygame.Rect]]:
+    rects: list[tuple[int, pygame.Rect]] = []
+    y = area.bottom - 10
+    cx = area.centerx
+    for index, item in enumerate(items):
+        h = INGREDIENTS[item]["height"]
+        w = layer_width(item)
+        y -= h
+        rects.append((index, pygame.Rect(cx - w // 2, y, w, h)))
+    return rects
 
 
 def layer_width(ingredient_id: str) -> int:
@@ -193,12 +233,28 @@ def draw_scene(
     pygame.draw.rect(surf, PALETTE["navy_hi"], HUD_RECT)
     pygame.draw.line(surf, PALETTE["black"], (0, HUD_RECT.bottom), (GAME_W, HUD_RECT.bottom))
     draw_text(surf, font, "BURGER STOP", (6, 5), PALETTE["gold"])
+    time_color = PALETTE["green"]
+    if game.anger >= 2 or game.feedback is Feedback.LEFT:
+        time_color = PALETTE["red"]
+    elif game.anger == 1:
+        time_color = PALETTE["gold"]
+    time_label = f"T{game.seconds_left:02d}"
+    draw_text(surf, font, time_label, (148, 5), time_color)
+    bar = pygame.Rect(148, 14, 48, 3)
+    pygame.draw.rect(surf, PALETTE["black"], bar)
+    fill_w = int(bar.w * max(0, game.time_ms) / ORDER_MS)
+    pygame.draw.rect(surf, time_color, (bar.x, bar.y, fill_w, bar.h))
     score = f"SCORE {game.score:04d}"
     draw_text(surf, font, score, (GAME_W - 8 - tiny.size(score)[0], 5), PALETTE["white"])
 
-    draw_panel(surf, TICKET_RECT, PALETTE["paper"])
+    ticket_fill = PALETTE["paper"]
+    if game.anger >= 2:
+        ticket_fill = (248, 184, 164)
+    if game.feedback is Feedback.LEFT:
+        ticket_fill = (248, 140, 120)
+    draw_panel(surf, TICKET_RECT, ticket_fill)
     draw_text(surf, tiny, "ORDER", (TICKET_RECT.x + 8, TICKET_RECT.y + 6), PALETTE["black"])
-    draw_customer(surf, TICKET_RECT.x + 34, TICKET_RECT.y + 16)
+    draw_customer(surf, TICKET_RECT.x + 34, TICKET_RECT.y + 16, game.anger)
     draw_text(surf, tiny, game.customer, (TICKET_RECT.x + 8, TICKET_RECT.y + 36), PALETTE["black"])
     y = TICKET_RECT.y + 50
     # Ticket shows the finished stack top-to-bottom; build from the plate up.
@@ -212,6 +268,7 @@ def draw_scene(
     pygame.draw.rect(surf, PALETTE["navy_hi"], BUILD_RECT)
     pygame.draw.rect(surf, PALETTE["black"], BUILD_RECT, 2)
     draw_text(surf, tiny, "BUILD", (BUILD_RECT.x + 6, BUILD_RECT.y + 4), PALETTE["white"])
+    draw_text(surf, tiny, "CLICK TO PULL", (BUILD_RECT.x + 6, BUILD_RECT.y + 14), PALETTE["gray"])
     # plate
     pygame.draw.rect(surf, PALETTE["gray"], (BUILD_RECT.x + 12, BUILD_RECT.bottom - 12, BUILD_RECT.w - 24, 6))
     pygame.draw.rect(surf, PALETTE["black"], (BUILD_RECT.x + 12, BUILD_RECT.bottom - 12, BUILD_RECT.w - 24, 6), 1)
@@ -230,6 +287,8 @@ def draw_scene(
         msg, color = "TRY AGAIN", PALETTE["red"]
     elif game.feedback is Feedback.RIGHT:
         msg, color = "ORDER COMPLETE!", PALETTE["green"]
+    elif game.feedback is Feedback.LEFT:
+        msg, color = game.curse, PALETTE["red"]
     else:
         msg, color = "STACK THE ORDER", PALETTE["cream"]
     draw_text(surf, tiny, msg, (MSG_RECT.x + 8, MSG_RECT.y + 12), color)
@@ -250,6 +309,10 @@ def handle_click(game: Game, pos: tuple[int, int], tray_buttons: dict[str, pygam
     if CLEAR_RECT.collidepoint(gx, gy):
         game.clear_stack()
         return
+    for _index, rect in stack_layer_rects(game.stack, BUILD_RECT):
+        if rect.collidepoint(gx, gy):
+            game.remove_at(_index)
+            return
     for ingredient_id, rect in tray_buttons.items():
         if rect.collidepoint(gx, gy):
             game.add_ingredient(ingredient_id)

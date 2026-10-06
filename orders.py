@@ -18,6 +18,8 @@ PALETTE = {
     "green": (48, 184, 80),
     "gold": (248, 208, 64),
     "skin": (248, 184, 136),
+    "skin_mad": (248, 120, 96),
+    "skin_rage": (232, 72, 72),
     "hair": (88, 56, 32),
 }
 
@@ -32,15 +34,16 @@ INGREDIENTS: dict[str, dict] = {
     "top_bun": {"label": "TOP BUN", "color": (232, 168, 72), "height": 10},
 }
 
+# Top of tray = top of burger.
 TRAY_ORDER = [
-    "bottom_bun",
-    "patty",
-    "cheese",
-    "lettuce",
-    "tomato",
-    "onion",
-    "pickle",
     "top_bun",
+    "pickle",
+    "onion",
+    "tomato",
+    "lettuce",
+    "cheese",
+    "patty",
+    "bottom_bun",
 ]
 
 FILLINGS = ["patty", "cheese", "lettuce", "tomato", "onion", "pickle"]
