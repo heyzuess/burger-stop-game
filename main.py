@@ -94,9 +94,9 @@ def draw_customer(surf: pygame.Surface, x: int, y: int, anger: int) -> None:
     pygame.draw.rect(surf, PALETTE["black"], (x + 5, y + 6, 2, 2))
     pygame.draw.rect(surf, PALETTE["black"], (x + 9, y + 6, 2, 2))
     if anger == 0:
-        pygame.draw.rect(surf, PALETTE["black"], (x + 6, y + 9, 4, 1))
-        pygame.draw.rect(surf, PALETTE["black"], (x + 5, y + 10, 1, 1))
-        pygame.draw.rect(surf, PALETTE["black"], (x + 10, y + 10, 1, 1))
+        pygame.draw.rect(surf, PALETTE["black"], (x + 6, y + 10, 4, 1))
+        pygame.draw.rect(surf, PALETTE["black"], (x + 5, y + 9, 1, 1))
+        pygame.draw.rect(surf, PALETTE["black"], (x + 10, y + 9, 1, 1))
     elif anger == 1:
         pygame.draw.rect(surf, PALETTE["black"], (x + 6, y + 10, 4, 1))
         pygame.draw.rect(surf, PALETTE["black"], (x + 4, y + 5, 3, 1))
