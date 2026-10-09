@@ -36,7 +36,7 @@ To leave the virtual environment later, run `deactivate`.
 
 ## Play
 
-Title screen: **PLAY** starts a new game (default difficulty **Easy**; Setup can change it). **SETUP** is difficulty, how to play, and the GitHub page. Esc from a game returns to the title.
+Title screen: **PLAY** starts a new game (default difficulty **Easy**; Setup can change it). **SETUP** is difficulty, how to play, and the GitHub page. **EXIT** closes the game. In a round, **PAUSE** (or Esc) opens resume, how to play, About/GitHub, and quit-to-title (with a confirm prompt).
 
 - Click ingredients on the right to stack them. Tray is stacked like a burger (top bun at the top). Easy has fewer tray items; Hard has the full set.
 - Click a layer on the burger to pull that ingredient out.

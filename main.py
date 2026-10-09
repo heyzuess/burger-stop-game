@@ -15,20 +15,30 @@ from game import ORDER_MS, Feedback, Game
 from menu import (
     BACK_RECT,
     DIFF_RECTS,
+    EXIT_RECT,
     GITHUB_HIT,
     GITHUB_URL,
+    NO_RECT,
+    PAUSE_ABOUT_RECT,
+    PAUSE_HELP_RECT,
+    PAUSE_QUIT_RECT,
+    PAUSE_RESUME_RECT,
     PLAY_RECT,
     SETUP_ABOUT_RECT,
     SETUP_DIFF_RECT,
     SETUP_HELP_RECT,
     SETUP_RECT,
+    YES_RECT,
     Screen,
     draw_about,
     draw_checker,
+    draw_confirm_quit,
     draw_difficulty,
     draw_help,
+    draw_pause_overlay,
     draw_setup,
     draw_title,
+    title_hover_at,
 )
 from orders import DEFAULT_DIFFICULTY, DIFFICULTIES, INGREDIENTS, PALETTE, tray_ids
 
@@ -235,6 +245,7 @@ def make_tray_buttons(difficulty: str = DEFAULT_DIFFICULTY) -> dict[str, pygame.
 
 SERVE_RECT = pygame.Rect(218, 204, 46, 28)
 CLEAR_RECT = pygame.Rect(268, 204, 46, 28)
+PAUSE_RECT = pygame.Rect(270, 1, 46, 16)
 
 
 def draw_scene(
@@ -259,13 +270,14 @@ def draw_scene(
     elif game.anger == 1:
         time_color = PALETTE["gold"]
     time_label = f"T{game.seconds_left:02d}"
-    draw_text(surf, font, time_label, (148, 5), time_color)
-    bar = pygame.Rect(148, 14, 48, 3)
+    draw_text(surf, font, time_label, (128, 5), time_color)
+    bar = pygame.Rect(128, 14, 40, 3)
     pygame.draw.rect(surf, PALETTE["black"], bar)
     fill_w = int(bar.w * max(0, game.time_ms) / ORDER_MS)
     pygame.draw.rect(surf, time_color, (bar.x, bar.y, fill_w, bar.h))
-    score = f"SCORE {game.score:04d}"
-    draw_text(surf, font, score, (GAME_W - 8 - tiny.size(score)[0], 5), PALETTE["white"])
+    score = f"{game.score:04d}"
+    draw_text(surf, font, score, (176, 5), PALETTE["white"])
+    draw_button(surf, PAUSE_RECT, PALETTE["gold"], "PAUSE", tiny, PALETTE["black"])
 
     ticket_fill = PALETTE["paper"]
     if game.anger >= 2:
@@ -321,8 +333,12 @@ def to_game_pos(pos: tuple[int, int]) -> tuple[int, int]:
     return pos[0] // SCALE, pos[1] // SCALE
 
 
-def handle_play_click(game: Game, pos: tuple[int, int], tray_buttons: dict[str, pygame.Rect]) -> None:
+def handle_play_click(
+    game: Game, pos: tuple[int, int], tray_buttons: dict[str, pygame.Rect]
+) -> str | None:
     gx, gy = to_game_pos(pos)
+    if PAUSE_RECT.collidepoint(gx, gy):
+        return "pause"
     if SERVE_RECT.collidepoint(gx, gy):
         game.serve()
         return
@@ -364,25 +380,31 @@ def main() -> None:
             if event.type == pygame.QUIT:
                 running = False
             elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-                if screen is Screen.TITLE:
-                    running = False
-                elif screen is Screen.PLAYING:
-                    screen = Screen.TITLE
-                    game = None
+                if screen is Screen.PLAYING:
+                    screen = Screen.PAUSE
+                elif screen is Screen.PAUSE:
+                    screen = Screen.PLAYING
+                elif screen is Screen.CONFIRM_QUIT:
+                    screen = Screen.PAUSE
+                elif screen is Screen.PAUSE_HELP or screen is Screen.PAUSE_ABOUT:
+                    screen = Screen.PAUSE
                 elif screen is Screen.SETUP:
                     screen = Screen.TITLE
-                else:
+                elif screen in (Screen.DIFFICULTY, Screen.HELP, Screen.ABOUT):
                     screen = Screen.SETUP
             elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 gx, gy = to_game_pos(event.pos)
                 if screen is Screen.PLAYING and game is not None:
-                    handle_play_click(game, event.pos, tray_buttons)
+                    if handle_play_click(game, event.pos, tray_buttons) == "pause":
+                        screen = Screen.PAUSE
                 elif screen is Screen.TITLE:
                     if PLAY_RECT.collidepoint(gx, gy):
                         game, tray_buttons = start_play(difficulty)
                         screen = Screen.PLAYING
                     elif SETUP_RECT.collidepoint(gx, gy):
                         screen = Screen.SETUP
+                    elif EXIT_RECT.collidepoint(gx, gy):
+                        running = False
                 elif screen is Screen.SETUP:
                     if SETUP_DIFF_RECT.collidepoint(gx, gy):
                         screen = Screen.DIFFICULTY
@@ -407,15 +429,62 @@ def main() -> None:
                         webbrowser.open(GITHUB_URL)
                     elif BACK_RECT.collidepoint(gx, gy):
                         screen = Screen.SETUP
+                elif screen is Screen.PAUSE:
+                    if PAUSE_RESUME_RECT.collidepoint(gx, gy):
+                        screen = Screen.PLAYING
+                    elif PAUSE_HELP_RECT.collidepoint(gx, gy):
+                        screen = Screen.PAUSE_HELP
+                    elif PAUSE_ABOUT_RECT.collidepoint(gx, gy):
+                        screen = Screen.PAUSE_ABOUT
+                    elif PAUSE_QUIT_RECT.collidepoint(gx, gy):
+                        screen = Screen.CONFIRM_QUIT
+                elif screen is Screen.PAUSE_HELP:
+                    if BACK_RECT.collidepoint(gx, gy):
+                        screen = Screen.PAUSE
+                elif screen is Screen.PAUSE_ABOUT:
+                    if GITHUB_HIT.collidepoint(gx, gy):
+                        webbrowser.open(GITHUB_URL)
+                    elif BACK_RECT.collidepoint(gx, gy):
+                        screen = Screen.PAUSE
+                elif screen is Screen.CONFIRM_QUIT:
+                    if YES_RECT.collidepoint(gx, gy):
+                        game = None
+                        screen = Screen.TITLE
+                    elif NO_RECT.collidepoint(gx, gy):
+                        screen = Screen.PAUSE
 
         if screen is Screen.PLAYING and game is not None:
             game.update(dt)
             draw_scene(game_surf, game, font, tiny, tray_buttons)
+        elif screen in (
+            Screen.PAUSE,
+            Screen.PAUSE_HELP,
+            Screen.PAUSE_ABOUT,
+            Screen.CONFIRM_QUIT,
+        ) and game is not None:
+            draw_scene(game_surf, game, font, tiny, tray_buttons)
+            if screen is Screen.PAUSE:
+                draw_pause_overlay(game_surf, tiny, draw_button, draw_text)
+            elif screen is Screen.PAUSE_HELP:
+                draw_checker(game_surf, GAME_W, GAME_H)
+                draw_help(game_surf, tiny, draw_button, draw_text)
+            elif screen is Screen.PAUSE_ABOUT:
+                draw_checker(game_surf, GAME_W, GAME_H)
+                draw_about(game_surf, tiny, draw_button, draw_text)
+            else:
+                draw_confirm_quit(game_surf, tiny, draw_button, draw_text)
         else:
             draw_checker(game_surf, GAME_W, GAME_H)
             if screen is Screen.TITLE:
+                hovered = title_hover_at(to_game_pos(pygame.mouse.get_pos()))
                 draw_title(
-                    game_surf, font, tiny, difficulty, draw_button, draw_text
+                    game_surf,
+                    font,
+                    tiny,
+                    difficulty,
+                    draw_button,
+                    draw_text,
+                    hovered,
                 )
             elif screen is Screen.SETUP:
                 draw_setup(game_surf, tiny, draw_button, draw_text)
