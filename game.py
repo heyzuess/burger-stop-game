@@ -5,7 +5,7 @@ from __future__ import annotations
 import random
 from enum import Enum
 
-from orders import generate_order
+from orders import DEFAULT_DIFFICULTY, generate_order
 
 CORRECT_POINTS = 10
 WRONG_PENALTY = 2
@@ -25,7 +25,8 @@ class Feedback(str, Enum):
 
 
 class Game:
-    def __init__(self) -> None:
+    def __init__(self, difficulty: str = DEFAULT_DIFFICULTY) -> None:
+        self.difficulty = difficulty
         self.score = 0
         self.customer = ""
         self.ticket: tuple[str, ...] = ()
@@ -37,7 +38,7 @@ class Game:
         self.new_round()
 
     def new_round(self) -> None:
-        order = generate_order()
+        order = generate_order(self.difficulty)
         self.customer = order.customer
         self.ticket = order.items
         self.stack = []

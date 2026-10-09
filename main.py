@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import webbrowser
 from pathlib import Path
 
 # Nearest-neighbor scaling (chunky pixels, no blur)
@@ -11,7 +12,25 @@ os.environ.setdefault("SDL_HINT_RENDER_SCALE_QUALITY", "0")
 import pygame
 
 from game import ORDER_MS, Feedback, Game
-from orders import INGREDIENTS, PALETTE, TRAY_ORDER
+from menu import (
+    BACK_RECT,
+    DIFF_RECTS,
+    GITHUB_HIT,
+    GITHUB_URL,
+    PLAY_RECT,
+    SETUP_ABOUT_RECT,
+    SETUP_DIFF_RECT,
+    SETUP_HELP_RECT,
+    SETUP_RECT,
+    Screen,
+    draw_about,
+    draw_checker,
+    draw_difficulty,
+    draw_help,
+    draw_setup,
+    draw_title,
+)
+from orders import DEFAULT_DIFFICULTY, DIFFICULTIES, INGREDIENTS, PALETTE, tray_ids
 
 GAME_W, GAME_H = 320, 240
 SCALE = 3
@@ -205,10 +224,10 @@ def draw_stack(
         draw_burger_layer(surf, item, cx, y, w)
 
 
-def make_tray_buttons() -> dict[str, pygame.Rect]:
+def make_tray_buttons(difficulty: str = DEFAULT_DIFFICULTY) -> dict[str, pygame.Rect]:
     buttons: dict[str, pygame.Rect] = {}
     x, y = TRAY_RECT.x + 4, TRAY_RECT.y + 14
-    for ingredient_id in TRAY_ORDER:
+    for ingredient_id in tray_ids(difficulty):
         buttons[ingredient_id] = pygame.Rect(x, y, TRAY_RECT.w - 8, 16)
         y += 18
     return buttons
@@ -232,7 +251,8 @@ def draw_scene(
                 pygame.draw.rect(surf, PALETTE["navy_hi"], (tx, ty, 8, 8))
     pygame.draw.rect(surf, PALETTE["navy_hi"], HUD_RECT)
     pygame.draw.line(surf, PALETTE["black"], (0, HUD_RECT.bottom), (GAME_W, HUD_RECT.bottom))
-    draw_text(surf, font, "BURGER STOP", (6, 5), PALETTE["gold"])
+    title = f"BURGER STOP {DIFFICULTIES[game.difficulty].label[:3]}"
+    draw_text(surf, font, title, (6, 5), PALETTE["gold"])
     time_color = PALETTE["green"]
     if game.anger >= 2 or game.feedback is Feedback.LEFT:
         time_color = PALETTE["red"]
@@ -301,7 +321,7 @@ def to_game_pos(pos: tuple[int, int]) -> tuple[int, int]:
     return pos[0] // SCALE, pos[1] // SCALE
 
 
-def handle_click(game: Game, pos: tuple[int, int], tray_buttons: dict[str, pygame.Rect]) -> None:
+def handle_play_click(game: Game, pos: tuple[int, int], tray_buttons: dict[str, pygame.Rect]) -> None:
     gx, gy = to_game_pos(pos)
     if SERVE_RECT.collidepoint(gx, gy):
         game.serve()
@@ -319,6 +339,10 @@ def handle_click(game: Game, pos: tuple[int, int], tray_buttons: dict[str, pygam
             return
 
 
+def start_play(difficulty: str) -> tuple[Game, dict[str, pygame.Rect]]:
+    return Game(difficulty), make_tray_buttons(difficulty)
+
+
 def main() -> None:
     pygame.init()
     pygame.display.set_caption("BURGER STOP")
@@ -327,8 +351,11 @@ def main() -> None:
     clock = pygame.time.Clock()
     font = load_font(8)
     tiny = load_font(8)
-    tray_buttons = make_tray_buttons()
-    game = Game()
+
+    screen = Screen.TITLE
+    difficulty = DEFAULT_DIFFICULTY
+    game: Game | None = None
+    tray_buttons: dict[str, pygame.Rect] = {}
     running = True
 
     while running:
@@ -337,12 +364,70 @@ def main() -> None:
             if event.type == pygame.QUIT:
                 running = False
             elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-                running = False
+                if screen is Screen.TITLE:
+                    running = False
+                elif screen is Screen.PLAYING:
+                    screen = Screen.TITLE
+                    game = None
+                elif screen is Screen.SETUP:
+                    screen = Screen.TITLE
+                else:
+                    screen = Screen.SETUP
             elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                handle_click(game, event.pos, tray_buttons)
+                gx, gy = to_game_pos(event.pos)
+                if screen is Screen.PLAYING and game is not None:
+                    handle_play_click(game, event.pos, tray_buttons)
+                elif screen is Screen.TITLE:
+                    if PLAY_RECT.collidepoint(gx, gy):
+                        game, tray_buttons = start_play(difficulty)
+                        screen = Screen.PLAYING
+                    elif SETUP_RECT.collidepoint(gx, gy):
+                        screen = Screen.SETUP
+                elif screen is Screen.SETUP:
+                    if SETUP_DIFF_RECT.collidepoint(gx, gy):
+                        screen = Screen.DIFFICULTY
+                    elif SETUP_HELP_RECT.collidepoint(gx, gy):
+                        screen = Screen.HELP
+                    elif SETUP_ABOUT_RECT.collidepoint(gx, gy):
+                        screen = Screen.ABOUT
+                    elif BACK_RECT.collidepoint(gx, gy):
+                        screen = Screen.TITLE
+                elif screen is Screen.DIFFICULTY:
+                    for key, rect in DIFF_RECTS.items():
+                        if rect.collidepoint(gx, gy):
+                            difficulty = key
+                            break
+                    if BACK_RECT.collidepoint(gx, gy):
+                        screen = Screen.SETUP
+                elif screen is Screen.HELP:
+                    if BACK_RECT.collidepoint(gx, gy):
+                        screen = Screen.SETUP
+                elif screen is Screen.ABOUT:
+                    if GITHUB_HIT.collidepoint(gx, gy):
+                        webbrowser.open(GITHUB_URL)
+                    elif BACK_RECT.collidepoint(gx, gy):
+                        screen = Screen.SETUP
 
-        game.update(dt)
-        draw_scene(game_surf, game, font, tiny, tray_buttons)
+        if screen is Screen.PLAYING and game is not None:
+            game.update(dt)
+            draw_scene(game_surf, game, font, tiny, tray_buttons)
+        else:
+            draw_checker(game_surf, GAME_W, GAME_H)
+            if screen is Screen.TITLE:
+                draw_title(
+                    game_surf, font, tiny, difficulty, draw_button, draw_text
+                )
+            elif screen is Screen.SETUP:
+                draw_setup(game_surf, tiny, draw_button, draw_text)
+            elif screen is Screen.DIFFICULTY:
+                draw_difficulty(
+                    game_surf, tiny, difficulty, draw_button, draw_text
+                )
+            elif screen is Screen.HELP:
+                draw_help(game_surf, tiny, draw_button, draw_text)
+            elif screen is Screen.ABOUT:
+                draw_about(game_surf, tiny, draw_button, draw_text)
+
         scaled = pygame.transform.scale_by(game_surf, SCALE)
         window.blit(scaled, (0, 0))
         pygame.display.flip()

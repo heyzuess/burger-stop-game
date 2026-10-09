@@ -50,6 +50,36 @@ FILLINGS = ["patty", "cheese", "lettuce", "tomato", "onion", "pickle"]
 
 CUSTOMERS = ["BOB", "LISA", "MIKE", "AMY", "TED", "NINA", "JOE", "KIM"]
 
+DEFAULT_DIFFICULTY = "easy"
+
+
+@dataclass(frozen=True)
+class Difficulty:
+    key: str
+    label: str
+    fillings: tuple[str, ...]
+    filling_min: int
+    filling_max: int
+
+
+DIFFICULTIES: dict[str, Difficulty] = {
+    "easy": Difficulty("easy", "EASY", ("patty", "cheese"), 1, 2),
+    "medium": Difficulty(
+        "medium",
+        "MEDIUM",
+        ("patty", "cheese", "lettuce", "tomato"),
+        2,
+        3,
+    ),
+    "hard": Difficulty(
+        "hard",
+        "HARD",
+        ("patty", "cheese", "lettuce", "tomato", "onion", "pickle"),
+        2,
+        4,
+    ),
+}
+
 
 @dataclass(frozen=True)
 class Order:
@@ -57,8 +87,18 @@ class Order:
     items: tuple[str, ...]
 
 
-def generate_order() -> Order:
-    filling_count = random.randint(2, 4)
-    fillings = [random.choice(FILLINGS) for _ in range(filling_count)]
+def tray_ids(difficulty: str = DEFAULT_DIFFICULTY) -> tuple[str, ...]:
+    fillings = set(DIFFICULTIES[difficulty].fillings)
+    return tuple(
+        item
+        for item in TRAY_ORDER
+        if item in ("top_bun", "bottom_bun") or item in fillings
+    )
+
+
+def generate_order(difficulty: str = DEFAULT_DIFFICULTY) -> Order:
+    spec = DIFFICULTIES[difficulty]
+    filling_count = random.randint(spec.filling_min, spec.filling_max)
+    fillings = [random.choice(spec.fillings) for _ in range(filling_count)]
     items = ("bottom_bun", *fillings, "top_bun")
     return Order(customer=random.choice(CUSTOMERS), items=items)
