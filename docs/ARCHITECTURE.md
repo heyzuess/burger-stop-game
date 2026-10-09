@@ -55,7 +55,7 @@ Startup builds a native 320×240 surface plus a 960×720 window (3× nearest-nei
 flowchart TD
   start[pygame.init and Game]
   events[Pump pygame events]
-  click{Left click?}
+  leftClick{Left click?}
   handle[handle_click]
   update[Game.update dt]
   draw[draw_scene]
@@ -66,9 +66,9 @@ flowchart TD
   start --> events
   events --> quitEvent
   quitEvent -->|yes| stop
-  quitEvent -->|no| click
-  click -->|yes| handle
-  click -->|no| update
+  quitEvent -->|no| leftClick
+  leftClick -->|yes| handle
+  leftClick -->|no| update
   handle --> update
   update --> draw
   draw --> scale
